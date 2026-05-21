@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PlotIQ — Smart City Property Registry</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     HEADER
+═══════════════════════════════════════ -->
+<header>
+  <div class="logo">Plot<em>IQ</em></div>
+
+  <div class="header-tabs">
+    <button class="tab-btn active" id="btn-tab-draw"  onclick="switchTab('draw')">
+      <span class="tab-icon">✏</span> Draw Boundary
+    </button>
+    <button class="tab-btn" id="btn-tab-room"  onclick="switchTab('room')">
+      <span class="tab-icon">🏠</span> Label Rooms
+    </button>
+    <button class="tab-btn" id="btn-tab-saved" onclick="switchTab('saved')">
+      <span class="tab-icon">📋</span> Saved Houses
+    </button>
+  </div>
+
+  <div class="header-stats">
+    <div class="stat-pill">
+      <span class="stat-label">Properties</span>
+      <strong id="stat-total">0</strong>
+    </div>
+    <div class="stat-pill verified-pill">
+      <span class="stat-label">Verified</span>
+      <strong id="stat-verified">0</strong>
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════
+     MAIN LAYOUT
+═══════════════════════════════════════ -->
+<div class="layout">
+
+  <!-- ══════════ SIDEBAR ══════════ -->
+  <aside class="sidebar">
+
+    <!-- ── TAB 1: DRAW BOUNDARY ── -->
+    <div id="tab-draw" class="tab-panel">
+      <div class="sidebar-body">
+
+        <!-- Location Search -->
+        <div class="sidebar-block">
+          <div class="block-label">Step 1 — Find Your Location</div>
+          <div class="loc-row">
+            <input id="location-search" type="text" class="loc-input"
+              placeholder="e.g. Soan Garden Street 1, Islamabad"
+              onkeydown="if(event.key==='Enter') searchLocation()"/>
+            <button class="loc-btn" onclick="searchLocation()">Search</button>
+          </div>
+          <div id="search-results-list" class="results-dropdown" style="display:none"></div>
+          <div id="location-confirmed" class="loc-ok" style="display:none">
+            ✓ Location found — zoom in to see plot outlines, then draw your boundary
+          </div>
+        </div>
+
+        <!-- Step Guide -->
+        <div class="sidebar-block">
+          <div class="block-label">How It Works</div>
+          <div class="steps-list">
+            <div class="step-item active" id="s1">
+              <div class="step-dot" id="s1n">1</div>
+              <div class="step-body">
+                <strong>Search location</strong>
+                <span>Type your street or area above</span>
+              </div>
+            </div>
+            <div class="step-item" id="s2">
+              <div class="step-dot" id="s2n">2</div>
+              <div class="step-body">
+                <strong>Identify your plot</strong>
+                <span>Orange outlines show each plot</span>
+              </div>
+            </div>
+            <div class="step-item" id="s3">
+              <div class="step-dot" id="s3n">3</div>
+              <div class="step-body">
+                <strong>Draw boundary</strong>
+                <span>Click corners of your plot only</span>
+              </div>
+            </div>
+            <div class="step-item" id="s4">
+              <div class="step-dot" id="s4n">4</div>
+              <div class="step-body">
+                <strong>Draw house structure</strong>
+                <span>Open the structure editor</span>
+              </div>
+            </div>
+            <div class="step-item" id="s5">
+              <div class="step-dot" id="s5n">5</div>
+              <div class="step-body">
+                <strong>Fill details &amp; save</strong>
+                <span>Add owner info and submit</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Property Form -->
+        <div class="sidebar-block">
+          <div class="block-label">Property Details</div>
+          <div class="form-grid">
+            <div class="field full">
+              <label>Owner Name</label>
+              <input id="f-owner" type="text" placeholder="e.g. Ahmed Khan"/>
+            </div>
+            <div class="field full">
+              <label>Address</label>
+              <input id="f-address" type="text" placeholder="Auto-filled after search"/>
+            </div>
+            <div class="field">
+              <label>Type</label>
+              <select id="f-type">
+                <option>House</option>
+                <option>Villa</option>
+                <option>Apartment</option>
+                <option>Plot</option>
+                <option>Commercial</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Area (Marla) — auto-calculated</label>
+              <input id="f-area" type="number" placeholder="Auto-filled when boundary drawn" readonly style="background:var(--bg5);cursor:not-allowed;color:var(--text2)"/>
+            </div>
+            <div class="field">
+              <label>Price (PKR)</label>
+              <input id="f-price" type="number" placeholder="25000000"/>
+            </div>
+            <div class="field">
+              <label>Year Built</label>
+              <input id="f-year" type="number" placeholder="2020"/>
+            </div>
+            <div class="field full">
+              <label>Availability</label>
+              <select id="f-availability">
+                <option value="available">Available — For Sale</option>
+                <option value="for_rent">Available — For Rent</option>
+                <option value="occupied">Occupied — Not For Sale</option>
+                <option value="under_construction">Under Construction</option>
+                <option value="rented">Rented Out</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Area + Boundary Coordinates -->
+        <div class="sidebar-block">
+          <div class="block-label">Boundary Points (<span id="pt-count">0</span>)</div>
+
+          <!-- Live area measurement — shown after 3+ points -->
+          <div id="live-area-box" class="live-area-box" style="display:none">
+            <div class="live-area-title">Live Plot Area</div>
+            <div class="live-area-value" id="live-marla">0.00</div>
+            <div class="live-area-unit">Marla</div>
+            <div class="live-area-sub">
+              <span id="live-sqft">0</span> sq ft
+              &nbsp;|&nbsp;
+              <span id="live-sqm">0</span> sq m
+            </div>
+            <div class="live-area-note">1 Marla = 272.25 sq ft = 25.29 sq m</div>
+            <div class="live-area-final" id="live-final-msg" style="display:none">
+              ✓ Final measurement — auto-filled in form
+            </div>
+          </div>
+
+          <div class="coord-box" id="coord-list">
+            <div class="coord-empty">Search a location, then click the map to add points</div>
+          </div>
+        </div>
+
+        <!-- Structure Preview -->
+        <div id="struct-preview-area" style="display:none">
+          <div class="sidebar-block">
+            <div class="block-label">Structure Preview</div>
+            <div class="struct-preview-wrap">
+              <div class="struct-preview-label" id="struct-status-text">No structure drawn yet</div>
+              <canvas id="mini-preview" width="240" height="130" class="mini-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /sidebar-body -->
+
+      <!-- Action Buttons -->
+      <div class="action-bar">
+        <button class="btn-struct" id="btn-open-struct" onclick="openStructureEditor()" disabled>
+          Draw House Structure
+        </button>
+        <button class="btn-save" id="btn-save-house" onclick="saveHouse()" disabled>
+          Save House
+        </button>
+        <button class="btn-ghost" onclick="undoPoint()">↩ Undo Point</button>
+        <button class="btn-ghost" onclick="clearAll()">✕ Clear All</button>
+      </div>
+    </div>
+
+    <!-- ── TAB 2: LABEL ROOMS ── -->
+    <div id="tab-room" class="tab-panel" style="display:none">
+      <div class="sidebar-body">
+        <div class="sidebar-block">
+          <div class="block-label">Instructions</div>
+          <p class="hint-text">
+            Select a room type below, then click <strong>inside</strong>
+            your drawn boundary on the map to place the label.
+          </p>
+        </div>
+        <div class="sidebar-block">
+          <div class="block-label">Room Types</div>
+          <div class="room-chip-grid" id="room-grid"></div>
+          <div class="custom-room-row">
+            <input id="custom-room" type="text" placeholder="Custom room name..."/>
+            <button class="btn-add-room" onclick="addCustomRoom()">+ Add</button>
+          </div>
+        </div>
+      </div>
+      <div class="action-bar">
+        <button class="btn-save" onclick="saveHouse()">Save House</button>
+        <button class="btn-ghost" onclick="clearRooms()">Clear Room Labels</button>
+      </div>
+    </div>
+
+    <!-- ── TAB 3: SAVED HOUSES ── -->
+    <div id="tab-saved" class="tab-panel" style="display:none">
+      <div class="sidebar-body">
+
+        <!-- Search Bar -->
+        <div class="search-bar-wrap">
+          <span class="search-icon">⌕</span>
+          <input id="search-input" type="text"
+            placeholder="Search by owner, street, area..."
+            oninput="filterSaved()"/>
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="filter-chips-row">
+          <button class="fchip active" data-f="all"                onclick="setFilter(this)">All</button>
+          <button class="fchip" data-f="House"              onclick="setFilter(this)">House</button>
+          <button class="fchip" data-f="Villa"              onclick="setFilter(this)">Villa</button>
+          <button class="fchip" data-f="Apartment"          onclick="setFilter(this)">Apartment</button>
+          <button class="fchip" data-f="Plot"               onclick="setFilter(this)">Plot</button>
+          <button class="fchip" data-f="verified"           onclick="setFilter(this)">✓ Verified</button>
+          <button class="fchip avail" data-f="available"    onclick="setFilter(this)">For Sale</button>
+          <button class="fchip avail" data-f="for_rent"     onclick="setFilter(this)">For Rent</button>
+          <button class="fchip avail" data-f="occupied"     onclick="setFilter(this)">Occupied</button>
+          <button class="fchip avail" data-f="under_construction" onclick="setFilter(this)">Under Const.</button>
+          <button class="fchip avail" data-f="rented"       onclick="setFilter(this)">Rented</button>
+        </div>
+
+        <div class="result-count-row" id="result-count"></div>
+        <div id="saved-list"></div>
+
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ══════════ MAP ══════════ -->
+  <div id="map"></div>
+
+</div><!-- /layout -->
+
+<!-- ═══════════════════════════════════════
+     TOAST NOTIFICATION
+═══════════════════════════════════════ -->
+<div class="toast" id="toast"></div>
+
+<!-- ═══════════════════════════════════════
+     HOUSE STRUCTURE POPUP WINDOW
+═══════════════════════════════════════ -->
+<div class="popup-overlay" id="struct-overlay">
+  <div class="popup-box">
+
+    <div class="popup-hdr">
+      <div>
+        <div class="popup-title">House Structure Editor</div>
+        <div class="popup-sub" id="popup-subtitle">Draw rooms inside your plot boundary</div>
+      </div>
+      <button class="popup-close-btn" onclick="closeStructureEditor()">✕</button>
+    </div>
+
+    <div class="popup-body">
+
+      <!-- Left: Tools -->
+      <div class="draw-panel">
+        <div class="draw-panel-section">
+          <div class="panel-label">Drawing Mode</div>
+          <div class="draw-mode-btns">
+            <button class="dmode-btn active" id="dmode-room"  onclick="setDrawMode('room')">Draw Room</button>
+            <button class="dmode-btn"        id="dmode-wall"  onclick="setDrawMode('wall')">Draw Wall</button>
+            <button class="dmode-btn"        id="dmode-erase" onclick="setDrawMode('erase')">Erase</button>
+          </div>
+        </div>
+        <div class="draw-panel-section">
+          <div class="panel-label">Room Type</div>
+          <div class="draw-room-list" id="draw-room-list"></div>
+        </div>
+      </div>
+
+      <!-- Centre: Canvas -->
+      <div class="canvas-wrap">
+        <canvas id="struct-canvas"></canvas>
+      </div>
+
+      <!-- Right: Info -->
+      <div class="info-panel">
+        <div class="info-block">
+          <div class="panel-label">Mode</div>
+          <div class="info-value" id="mode-display">Draw Room</div>
+        </div>
+        <div class="info-block">
+          <div class="panel-label">Rooms</div>
+          <div class="info-value" id="rooms-placed-count">0</div>
+        </div>
+        <div class="info-block">
+          <div class="panel-label">Legend</div>
+          <div class="canvas-legend" id="canvas-legend"></div>
+        </div>
+        <div class="info-block" style="margin-top:auto">
+          <div class="panel-label">Actions</div>
+          <button class="dmode-btn" onclick="undoStruct()" style="width:100%;margin-bottom:5px">↩ Undo</button>
+          <button class="dmode-btn" onclick="clearCanvas()" style="width:100%">✕ Clear All</button>
+        </div>
+      </div>
+
+    </div><!-- /popup-body -->
+
+    <div class="popup-footer">
+      <div class="popup-hint" id="footer-hint">
+        Select a room type on the left → Click and drag on the canvas to draw it
+      </div>
+      <div class="popup-footer-btns">
+        <button class="btn-ghost-sm" onclick="clearCanvas()">Clear</button>
+        <button class="btn-save-sm" onclick="saveStructure()">✓ Save Structure</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
