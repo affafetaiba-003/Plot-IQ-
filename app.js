@@ -489,9 +489,26 @@ function clearCanvas() {
 
 function saveStructure() {
   if (!structRooms.length && !structWalls.length) { toast('Draw at least one room first', 2000); return; }
-  structureData = { rooms: [...structRooms], walls: [...structWalls], canvasW: canvas.width, canvasH: canvas.height };
+
+  // Capture canvas as base64 PNG image — used for structure preview
+  let structureImage = null;
+  try {
+    structureImage = canvas.toDataURL('image/png');
+  } catch (e) {
+    console.warn('Could not capture canvas image:', e);
+  }
+
+  structureData = {
+    rooms:   [...structRooms],
+    walls:   [...structWalls],
+    canvasW: canvas.width,
+    canvasH: canvas.height,
+    image:   structureImage   // base64 image stored here
+  };
+
   drawMiniPreview();
-  document.getElementById('struct-status-text').textContent = `${structRooms.length} room${structRooms.length!==1?'s':''} drawn`;
+  document.getElementById('struct-status-text').textContent =
+    `${structRooms.length} room${structRooms.length !== 1 ? 's' : ''} drawn`;
   closeStructureEditor();
   toast('Structure saved! Fill in details and click Save House.', 3000);
 }
@@ -520,15 +537,7 @@ function drawMiniPreview() {
 // ═══════════════════════════════════════
 async function saveHouse() {
   if (!polygonClosed) { toast('Close the boundary first', 2000); return; }
-  const ownerRaw = document.getElementById('f-owner').value.trim();
-  if (!ownerRaw) {
-    toast('Please enter the Owner Name before saving', 3000);
-    document.getElementById('f-owner').focus();
-    document.getElementById('btn-save-house').disabled = false;
-    document.getElementById('btn-save-house').textContent = 'Save House';
-    return;
-  }
-  const owner = ownerRaw;
+  const owner        = document.getElementById('f-owner').value.trim()   || 'Unknown Owner';
   const address      = document.getElementById('f-address').value.trim() || 'No address';
   const type         = document.getElementById('f-type').value;
   const area         = document.getElementById('f-area').value;
@@ -541,9 +550,9 @@ async function saveHouse() {
 
   const payload = {
     owner, address, type, area, price, year, availability,
-    points:    drawPoints.map(p => ({ lat: p.lat, lng: p.lng })),
-    rooms:     roomLabels.map(l => ({ name: l.name, color: l.color, lat: l.lat, lng: l.lng })),
-    structure: structureData   
+    structure: structureData,
+    points: drawPoints.map(p => ({ lat: p.lat, lng: p.lng })),
+    rooms:  roomLabels.map(l => ({ name: l.name, color: l.color, lat: l.lat, lng: l.lng })),
   };
 
   try {
@@ -592,10 +601,10 @@ function plotSavedHouse(h) {
     `<span class="ctag" style="background:${r.color}22;color:${r.color}">${r.name}</span>`
   ).join('');
 
-  const structRoomCount = h.structure && h.structure.rooms ? h.structure.rooms.length : 0;
-  const structBtn = (h.structure && structRoomCount > 0)
+  const hasStruct = h.structure && h.structure.rooms && h.structure.rooms.length > 0;
+  const structBtn = hasStruct
     ? `<button class="map-popup-struct-btn" onclick="previewStructure(${h.id})">
-        View House Structure (${structRoomCount} rooms)
+         🏠 View House Structure (${h.structure.rooms.length} rooms)
        </button>` : '';
 
   poly.bindPopup(`
@@ -623,9 +632,9 @@ function previewStructure(id) {
   structRooms   = [...h.structure.rooms];
   structWalls   = [...(h.structure.walls || [])];
   structureData = h.structure;
-  document.getElementById('popup-subtitle').textContent = `${h.owner} — ${h.address}`;
+  document.getElementById('popup-subtitle').textContent = h.owner + ' — ' + h.address;
   document.getElementById('struct-overlay').classList.add('open');
-  setTimeout(() => {
+  setTimeout(function() {
     resizeCanvas();
     renderDrawRoomList();
     renderLegend();
@@ -730,9 +739,9 @@ function renderSavedList() {
           <button class="btn-confirm-no"  onclick="event.stopPropagation();cancelDelete(${h.id})">Cancel</button>
         </div>
       </div>
-      ${(h.structure && h.structure.rooms && h.structure.rooms.length > 0)
-        ? `<button class="btn-struct-view" onclick="event.stopPropagation();previewStructure(${h.id})">
-             🏠 View House Structure (${h.structure.rooms.length} rooms)
+      ${h.structure && h.structure.rooms && h.structure.rooms.length > 0
+        ? `<button class="btn-view-struct" onclick="event.stopPropagation();previewStructure(${h.id})">
+             🏠 View House Structure &nbsp;<span class="struct-room-count">${h.structure.rooms.length} rooms</span>
            </button>` : ''}
       <button class="btn-avail-change" onclick="event.stopPropagation();openAvailModal(${h.id})">Change Availability</button>
     </div>`;
@@ -988,12 +997,16 @@ function updateCoords() {
 // ═══════════════════════════════════════
 function switchTab(t) {
   mode = t === 'room' ? 'room' : 'draw';
-  ['draw','room','saved'].forEach(n => {
-    document.getElementById('tab-'     + n).style.display = n===t ? 'flex'  : 'none';
-    document.getElementById('btn-tab-' + n).classList.toggle('active', n===t);
+  ['draw','room','saved','owners'].forEach(n => {
+    const panel = document.getElementById('tab-'     + n);
+    const btn   = document.getElementById('btn-tab-' + n);
+    if (panel) panel.style.display = n===t ? 'flex' : 'none';
+    if (btn)   btn.classList.toggle('active', n===t);
   });
-  if (t === 'room')  renderRoomGrid();
-  if (t === 'saved') renderSavedList();
+  if (t === 'room')   renderRoomGrid();
+  if (t === 'saved')  loadHousesFromDB();
+  if (t === 'owners') loadOwners();
+  updateSteps();
 }
 
 // ═══════════════════════════════════════
@@ -1006,8 +1019,166 @@ function toast(msg, dur = 2500) {
 }
 
 // ═══════════════════════════════════════
-// INITIALISE — loads from DB or localStorage
+// INITIALISE
 // ═══════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// OWNERS / USERS TAB
+// ═══════════════════════════════════════════════════
+let allOwners      = [];
+let activeOwnerFilter = 'all';
+
+async function loadOwners() {
+  const list = document.getElementById('owners-list');
+  if (!list) return;
+
+  // Show loading state
+  list.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;font-size:0.82rem">Loading users...</div>';
+
+  try {
+    const res = await fetch(API + '/users');
+    if (!res.ok) throw new Error('Server error ' + res.status);
+    allOwners = await res.json();
+    if (!Array.isArray(allOwners)) allOwners = [];
+    updateOwnerStats();
+    renderOwnersList();
+  } catch (err) {
+    list.innerHTML =
+      '<div style="color:#f87171;padding:20px;text-align:center;font-size:0.82rem">' +
+      'Cannot load users.<br/>Make sure node server.js is running.<br/>' +
+      '<small style="color:var(--muted)">' + err.message + '</small></div>';
+  }
+}
+
+function updateOwnerStats() {
+  const total   = allOwners.length;
+  const active  = allOwners.filter(u => u.IsActive).length;
+  const pending = allOwners.filter(u => !u.IsActive).length;
+  const tot = document.getElementById('owners-total-count');
+  const act = document.getElementById('owners-active-count');
+  const pen = document.getElementById('owners-pending-count');
+  if(tot) tot.textContent = total;
+  if(act) act.textContent = active;
+  if(pen) pen.textContent = pending;
+}
+
+function setOwnerFilter(el) {
+  document.querySelectorAll('[data-of]').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  activeOwnerFilter = el.dataset.of;
+  renderOwnersList();
+}
+
+function filterOwners() {
+  renderOwnersList();
+}
+
+function renderOwnersList() {
+  const query  = (document.getElementById('owner-search')?.value || '').toLowerCase();
+  const list   = document.getElementById('owners-list');
+  const countEl= document.getElementById('owner-result-count');
+
+  let filtered = allOwners.filter(u => {
+    const matchSearch = !query ||
+      u.FullName.toLowerCase().includes(query) ||
+      u.Username.toLowerCase().includes(query) ||
+      u.Email.toLowerCase().includes(query) ||
+      u.Role.toLowerCase().includes(query);
+
+    let matchFilter = true;
+    if (activeOwnerFilter === 'admin')   matchFilter = u.Role === 'admin';
+    if (activeOwnerFilter === 'dealer')  matchFilter = u.Role === 'dealer';
+    if (activeOwnerFilter === 'viewer')  matchFilter = u.Role === 'viewer';
+    if (activeOwnerFilter === 'active')  matchFilter = u.IsActive === true || u.IsActive === 1;
+    if (activeOwnerFilter === 'pending') matchFilter = !u.IsActive || u.IsActive === 0;
+
+    return matchSearch && matchFilter;
+  });
+
+  if(countEl) countEl.textContent = filtered.length + ' of ' + allOwners.length + ' users';
+
+  if (!filtered.length) {
+    list.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;font-size:0.82rem">No users match your search</div>';
+    return;
+  }
+
+  const roleColors = {
+    admin:  { bg:'rgba(220,38,38,0.10)',  border:'rgba(220,38,38,0.25)',  text:'#f87171', icon:'⚡' },
+    dealer: { bg:'rgba(14,165,233,0.10)', border:'rgba(14,165,233,0.25)', text:'#38bdf8', icon:'🏠' },
+    viewer: { bg:'rgba(163,230,53,0.10)', border:'rgba(163,230,53,0.25)', text:'#a3e635', icon:'👁' },
+  };
+
+  list.innerHTML = filtered.map(u => {
+    const rc  = roleColors[u.Role] || roleColors.dealer;
+    const isActive = u.IsActive === true || u.IsActive === 1;
+    const currentUser = window._plotiqUser || {};
+    const isCurrentUser = currentUser.Username === u.Username;
+    const isAdmin = currentUser.Role === 'admin';
+
+    return `
+    <div class="owner-card">
+      <div class="owner-card-top">
+        <div class="owner-avatar" style="background:${rc.bg};border:1px solid ${rc.border};color:${rc.text}">
+          ${u.FullName.charAt(0).toUpperCase()}
+        </div>
+        <div class="owner-info">
+          <div class="owner-name">
+            ${u.FullName}
+            ${isCurrentUser ? '<span class="you-badge">You</span>' : ''}
+          </div>
+          <div class="owner-username">@${u.Username}</div>
+        </div>
+        <div class="owner-status ${isActive ? 'status-active' : 'status-pending'}">
+          ${isActive ? '✓ Active' : '⏳ Pending'}
+        </div>
+      </div>
+      <div class="owner-meta">
+        <div class="owner-meta-row">
+          <span class="owner-meta-label">Email</span>
+          <span class="owner-meta-val">${u.Email || '—'}</span>
+        </div>
+        <div class="owner-meta-row">
+          <span class="owner-meta-label">Role</span>
+          <span class="owner-role-badge" style="background:${rc.bg};color:${rc.text};border:1px solid ${rc.border}">
+            ${rc.icon} ${u.Role.charAt(0).toUpperCase() + u.Role.slice(1)}
+          </span>
+        </div>
+        <div class="owner-meta-row">
+          <span class="owner-meta-label">Joined</span>
+          <span class="owner-meta-val">${u.CreatedAt || '—'}</span>
+        </div>
+        <div class="owner-meta-row">
+          <span class="owner-meta-label">Last Login</span>
+          <span class="owner-meta-val">${u.LastLogin || 'Never'}</span>
+        </div>
+      </div>
+      ${isAdmin && !isCurrentUser ? `
+      <div class="owner-actions">
+        ${isActive
+          ? `<button class="owner-btn-deactivate" onclick="toggleUserActive(${u.UserID}, false)">Deactivate</button>`
+          : `<button class="owner-btn-activate"   onclick="toggleUserActive(${u.UserID}, true)">Activate</button>`
+        }
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function toggleUserActive(userID, activate) {
+  try {
+    const res = await fetch(`${API}/users/${userID}/activate`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ active: activate })
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast(activate ? 'User activated' : 'User deactivated', 2000);
+      loadOwners();
+    }
+  } catch (err) {
+    toast('Failed to update user status', 2000);
+  }
+}
+
 async function init() {
   await loadHousesFromDB();
   renderRoomGrid(); updateSteps(); updateCoords();
