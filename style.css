@@ -687,14 +687,14 @@ header {
    STRUCTURE EDITOR POPUP
 ══════════════════════════════════════ */
 .popup-overlay {
-  position: fixed; inset: 0;
+  position: fixed; top: 0; right: 0; bottom: 0; left: 0;
   background: rgba(0, 0, 0, 0.82);
   z-index: 5000;
   display: flex; align-items: center; justify-content: center;
   opacity: 0; pointer-events: none;
   transition: opacity 0.22s;
 }
-.popup-overlay.open { opacity: 1; pointer-events: all; }
+.popup-overlay.open { opacity: 1; pointer-events: auto; }
 
 .popup-box {
   width: 880px; max-width: 96vw; height: 88vh;
@@ -927,23 +927,359 @@ header {
   box-shadow: none !important;
   border-color: var(--line) !important;
 }
-/* ── View Structure Button ── */
-.btn-struct-view {
-  width: 100%;
-  margin-top: 7px;
-  padding: 8px;
+
+
+/* ════════════════════════════════════════
+   AUTH — User Session Bar in Header
+════════════════════════════════════════ */
+.user-session-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.session-name {
+  font-size: 0.76rem;
+  color: var(--text2);
+  font-family: 'Outfit', sans-serif;
+  white-space: nowrap;
+}
+
+.session-role {
+  font-size: 0.67rem;
+  color: var(--muted);
+  background: var(--bg4);
+  border: 1px solid var(--line2);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-family: 'DM Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-logout {
+  padding: 5px 12px;
+  background: transparent;
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  color: var(--red);
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+
+.btn-logout:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+/* ════════════════════════════════════════
+   OWNERS TAB — Stats Row
+════════════════════════════════════════ */
+.owner-stats-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 0 6px;
+}
+
+.owner-stat-pill {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  border-radius: 8px;
+  padding: 9px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.owner-stat-pill span:first-child {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-family: 'DM Mono', monospace;
+  color: var(--text);
+}
+
+.owner-stat-pill span:last-child {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.owner-stat-pill.active-pill span:first-child { color: #4ade80; }
+.owner-stat-pill.pending-pill span:first-child { color: #fbbf24; }
+
+/* ════════════════════════════════════════
+   OWNERS TAB — Owner Cards
+════════════════════════════════════════ */
+.owner-card {
+  background: var(--bg3);
+  border: 1px solid var(--line2);
+  border-radius: 11px;
+  padding: 14px;
+  margin-bottom: 10px;
+  transition: border-color 0.18s, background 0.18s;
+}
+
+.owner-card:hover {
+  border-color: rgba(220,38,38,0.25);
+  background: var(--bg4);
+}
+
+.owner-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.owner-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  flex-shrink: 0;
+}
+
+.owner-info { flex: 1; min-width: 0; }
+
+.owner-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.owner-username {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  margin-top: 2px;
+}
+
+.you-badge {
+  font-size: 0.63rem;
+  background: var(--red-dim);
+  color: var(--red);
+  border: 1px solid rgba(220,38,38,0.25);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+}
+
+.owner-status {
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-active {
+  background: var(--green-dim);
+  color: #4ade80;
+  border: 1px solid rgba(22,163,74,0.25);
+}
+
+.status-pending {
+  background: rgba(217,119,6,0.10);
+  color: #fbbf24;
+  border: 1px solid rgba(217,119,6,0.25);
+}
+
+/* ── Owner meta rows ── */
+.owner-meta { display: flex; flex-direction: column; gap: 6px; }
+
+.owner-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.owner-meta-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 600;
+  min-width: 55px;
+}
+
+.owner-meta-val {
+  font-size: 0.78rem;
+  color: var(--text2);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 175px;
+}
+
+.owner-role-badge {
+  font-size: 0.71rem;
+  font-weight: 600;
+  border-radius: 5px;
+  padding: 2px 8px;
+}
+
+/* ── Owner action buttons ── */
+.owner-actions {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
+}
+
+.owner-btn-activate {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--green-dim);
+  border: 1px solid rgba(22,163,74,0.3);
+  color: #4ade80;
   border-radius: 7px;
-  border: 1.5px solid #1a56db;
-  background: rgba(26, 86, 219, 0.12);
-  color: #60a5fa;
   font-family: 'Outfit', sans-serif;
   font-size: 0.76rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s;
+}
+
+.owner-btn-activate:hover {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
+
+.owner-btn-deactivate {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--red-dim);
+  border: 1px solid rgba(220,38,38,0.25);
+  color: #f87171;
+  border-radius: 7px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.owner-btn-deactivate:hover {
+  background: var(--red);
+  color: #fff;
+  border-color: var(--red);
+}
+
+/* ── Owners tab specific fix ── */
+#tab-owners {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg2);
+}
+
+#tab-owners .sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Ensure sidebar never goes black */
+.sidebar {
+  background: var(--bg2) !important;
+}
+
+/* ════════════════════════════════════════
+   VIEW STRUCTURE BUTTON — House Cards
+════════════════════════════════════════ */
+.btn-view-struct {
+  width: 100%;
+  padding: 9px 14px;
+  margin-top: 8px;
+  margin-bottom: 0;
+  background: rgba(26, 86, 219, 0.10);
+  border: 1.5px solid rgba(26, 86, 219, 0.30);
+  border-radius: 8px;
+  color: #60a5fa;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.btn-view-struct:hover {
+  background: rgba(26, 86, 219, 0.20);
+  border-color: rgba(26, 86, 219, 0.55);
+  color: #93c5fd;
+  transform: translateY(-1px);
+}
+
+.btn-view-struct:active {
+  transform: translateY(0);
+}
+
+.struct-room-count {
+  font-size: 0.68rem;
+  font-weight: 500;
+  background: rgba(26, 86, 219, 0.15);
+  border: 1px solid rgba(26, 86, 219, 0.25);
+  border-radius: 4px;
+  padding: 1px 7px;
+  color: #93c5fd;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Map Popup Structure Button ── */
+.map-popup-struct-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(26, 86, 219, 0.12);
+  border: 1.5px solid rgba(26, 86, 219, 0.30);
+  border-radius: 7px;
+  color: #60a5fa;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: block;
   text-align: center;
 }
-.btn-struct-view:hover {
-  background: #1a56db;
-  color: #fff;
+
+.map-popup-struct-btn:hover {
+  background: rgba(26, 86, 219, 0.25);
+  border-color: rgba(26, 86, 219, 0.55);
+  color: #93c5fd;
 }
