@@ -26,8 +26,16 @@
     <button class="tab-btn" id="btn-tab-saved" onclick="switchTab('saved')">
       <span class="tab-icon">📋</span> Saved Houses
     </button>
+    <button class="tab-btn" id="btn-tab-owners" onclick="switchTab('owners')">
+      <span class="tab-icon">👥</span> Owners
+    </button>
   </div>
 
+  <div class="user-session-bar">
+    <span class="session-name" id="session-name">Loading...</span>
+    <span class="session-role" id="session-role"></span>
+    <button class="btn-logout" onclick="logoutUser()">Sign Out</button>
+  </div>
   <div class="header-stats">
     <div class="stat-pill">
       <span class="stat-label">Properties</span>
@@ -265,6 +273,55 @@
       </div>
     </div>
 
+    <!-- ── TAB 4: OWNERS ── -->
+    <div id="tab-owners" class="tab-panel" style="display:none;flex-direction:column;">
+      <div class="sidebar-body" style="padding:12px;overflow-y:auto;flex:1;">
+
+        <!-- Search bar -->
+        <div class="search-bar-wrap">
+          <span class="search-icon">⌕</span>
+          <input id="owner-search" type="text"
+            placeholder="Search by name, email, role..."
+            oninput="filterOwners()"/>
+        </div>
+
+        <!-- Stats row -->
+        <div class="owner-stats-row" id="owner-stats-row">
+          <div class="owner-stat-pill">
+            <span id="owners-total-count">0</span>
+            <span>Total Users</span>
+          </div>
+          <div class="owner-stat-pill active-pill">
+            <span id="owners-active-count">0</span>
+            <span>Active</span>
+          </div>
+          <div class="owner-stat-pill pending-pill">
+            <span id="owners-pending-count">0</span>
+            <span>Pending</span>
+          </div>
+        </div>
+
+        <!-- Filter chips -->
+        <div class="filter-chips-row">
+          <button class="fchip active" data-of="all"    onclick="setOwnerFilter(this)">All</button>
+          <button class="fchip" data-of="admin"         onclick="setOwnerFilter(this)">Admin</button>
+          <button class="fchip" data-of="dealer"        onclick="setOwnerFilter(this)">Dealer</button>
+          <button class="fchip" data-of="viewer"        onclick="setOwnerFilter(this)">Viewer</button>
+          <button class="fchip" data-of="active"        onclick="setOwnerFilter(this)">✓ Active</button>
+          <button class="fchip" data-of="pending"       onclick="setOwnerFilter(this)">⏳ Pending</button>
+        </div>
+
+        <div class="result-count-row" id="owner-result-count"></div>
+
+        <!-- Owner cards list -->
+        <div id="owners-list"></div>
+
+      </div>
+      <div class="action-bar">
+        <button class="btn-save" onclick="loadOwners()">↻ Refresh</button>
+      </div>
+    </div>
+
   </aside>
 
   <!-- ══════════ MAP ══════════ -->
@@ -352,6 +409,32 @@
 
 <!-- Scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── AUTH GUARD — runs before app.js ──
+(function(){
+  var stored = sessionStorage.getItem('plotiq_user');
+  if (!stored) { window.location.href = 'login.html'; return; }
+  try {
+    window._plotiqUser = JSON.parse(stored);
+  } catch(e) {
+    sessionStorage.removeItem('plotiq_user');
+    window.location.href = 'login.html';
+    return;
+  }
+  var u = window._plotiqUser;
+  document.addEventListener('DOMContentLoaded', function(){
+    var sn = document.getElementById('session-name');
+    var sr = document.getElementById('session-role');
+    if (sn) sn.textContent = u.FullName || 'User';
+    if (sr) sr.textContent = (u.Role || 'dealer').charAt(0).toUpperCase() + (u.Role || 'dealer').slice(1);
+  });
+})();
+
+function logoutUser(){
+  sessionStorage.removeItem('plotiq_user');
+  window.location.href = 'login.html';
+}
+</script>
 <script src="app.js"></script>
 </body>
 </html>
